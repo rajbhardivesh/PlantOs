@@ -1,0 +1,1000 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>PlantOS-Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;700&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.3.4/mqtt.min.js"></script>
+<style>
+:root {
+  --ios-blue:    #0A84FF;
+  --ios-green:   #30D158;
+  --ios-red:     #FF453A;
+  --ios-orange:  #FF9F0A;
+  --ios-yellow:  #FFD60A;
+  --ios-teal:    #5AC8FA;
+  --ios-purple:  #BF5AF2;
+  --ios-pink:    #FF375F;
+  --ios-indigo:  #5E5CE6;
+
+  --blur-bg:     rgba(28,28,30,0.82);
+  --blur-panel:  rgba(44,44,46,0.88);
+  --blur-card:   rgba(58,58,60,0.72);
+  --blur-border: rgba(255,255,255,0.08);
+  --blur-hover:  rgba(255,255,255,0.05);
+
+  --bg-primary:  #000000;
+  --bg-secondary:#1C1C1E;
+  --bg-tertiary: #2C2C2E;
+  --bg-grouped:  #3A3A3C;
+
+  --label-pri:   rgba(255,255,255,0.92);
+  --label-sec:   rgba(255,255,255,0.56);
+  --label-ter:   rgba(255,255,255,0.32);
+  --label-quat:  rgba(255,255,255,0.18);
+
+  --sep:         rgba(255,255,255,0.10);
+  --sep-strong:  rgba(255,255,255,0.18);
+
+  --radius-sm:   10px;
+  --radius-md:   14px;
+  --radius-lg:   20px;
+  --radius-xl:   28px;
+
+  --shadow-float:0 8px 32px rgba(0,0,0,0.55),0 2px 8px rgba(0,0,0,0.35);
+  --shadow-card: 0 2px 12px rgba(0,0,0,0.4);
+  --transition:  0.25s cubic-bezier(0.4,0,0.2,1);
+}
+
+[data-theme="light"] {
+  --blur-bg:     rgba(242,242,247,0.88);
+  --blur-panel:  rgba(255,255,255,0.85);
+  --blur-card:   rgba(255,255,255,0.78);
+  --blur-border: rgba(0,0,0,0.08);
+  --blur-hover:  rgba(0,0,0,0.04);
+  --bg-primary:  #F2F2F7;
+  --bg-secondary:#FFFFFF;
+  --bg-tertiary: #F2F2F7;
+  --bg-grouped:  #E5E5EA;
+  --label-pri:   rgba(0,0,0,0.88);
+  --label-sec:   rgba(0,0,0,0.52);
+  --label-ter:   rgba(0,0,0,0.30);
+  --label-quat:  rgba(0,0,0,0.15);
+  --sep:         rgba(0,0,0,0.08);
+  --sep-strong:  rgba(0,0,0,0.14);
+  --shadow-float:0 8px 32px rgba(0,0,0,0.14),0 2px 8px rgba(0,0,0,0.08);
+  --shadow-card: 0 2px 8px rgba(0,0,0,0.10);
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg-primary);color:var(--label-pri);
+  font-family:'Space Grotesk',-apple-system,BlinkMacSystemFont,sans-serif;
+  font-weight:400;min-height:100vh;overflow-x:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+body::before{
+  content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(ellipse 60% 50% at 15% 20%,rgba(10,132,255,0.07) 0%,transparent 60%),
+    radial-gradient(ellipse 50% 60% at 85% 80%,rgba(48,209,88,0.06) 0%,transparent 60%),
+    radial-gradient(ellipse 40% 40% at 50% 50%,rgba(94,92,230,0.04) 0%,transparent 60%);
+}
+[data-theme="light"] body::before{
+  background:
+    radial-gradient(ellipse 60% 50% at 15% 20%,rgba(10,132,255,0.06) 0%,transparent 60%),
+    radial-gradient(ellipse 50% 60% at 85% 80%,rgba(48,209,88,0.05) 0%,transparent 60%);
+}
+
+.wrap{position:relative;z-index:1;max-width:1380px;margin:0 auto;padding:20px 22px 60px}
+
+.glass{
+  background:var(--blur-card);
+  backdrop-filter:blur(24px) saturate(180%);
+  -webkit-backdrop-filter:blur(24px) saturate(180%);
+  border:1px solid var(--blur-border);
+  border-radius:var(--radius-lg);
+  transition:var(--transition);
+}
+.glass:hover{background:rgba(58,58,62,0.80);border-color:rgba(255,255,255,0.12)}
+[data-theme="light"] .glass:hover{background:rgba(255,255,255,0.88)}
+
+/* ── HEADER ── */
+header{
+  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;
+  padding:18px 26px;
+  background:var(--blur-bg);
+  backdrop-filter:blur(30px) saturate(200%);
+  -webkit-backdrop-filter:blur(30px) saturate(200%);
+  border:1px solid var(--blur-border);
+  border-radius:var(--radius-xl);
+  margin-bottom:22px;
+  box-shadow:var(--shadow-float);
+  animation:fadeSlideDown 0.6s cubic-bezier(0.34,1.56,0.64,1) both;
+}
+.brand{display:flex;align-items:center;gap:14px}
+.brand-mark{
+  width:48px;height:48px;
+  background:linear-gradient(145deg,#30D158,#0A84FF);
+  border-radius:14px;display:flex;align-items:center;justify-content:center;
+  font-size:24px;box-shadow:0 4px 16px rgba(48,209,88,0.35);flex-shrink:0;
+  transition:transform 0.4s cubic-bezier(0.34,1.56,0.64,1);
+}
+.brand-mark:hover{transform:rotate(-8deg) scale(1.08)}
+.brand-name{font-size:22px;font-weight:700;letter-spacing:-0.3px}
+.brand-sub{font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--label-sec);letter-spacing:2px;text-transform:uppercase;margin-top:2px}
+.hdr-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+
+.seg-ctrl{display:flex;background:var(--bg-tertiary);border-radius:10px;padding:2px;border:1px solid var(--sep)}
+.seg-btn{padding:6px 14px;border-radius:8px;border:none;cursor:pointer;font-size:12px;font-family:'Space Grotesk',sans-serif;font-weight:500;color:var(--label-sec);background:transparent;transition:var(--transition)}
+.seg-btn.active{background:var(--blur-panel);color:var(--label-pri);box-shadow:0 1px 4px rgba(0,0,0,0.25)}
+
+/* broker input row */
+.broker-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.broker-row input{
+  background:var(--bg-tertiary);border:1px solid var(--sep);
+  color:var(--label-pri);border-radius:var(--radius-sm);
+  padding:8px 12px;font-family:'JetBrains Mono',monospace;font-size:11px;
+  width:260px;outline:none;transition:var(--transition);
+}
+.broker-row input:focus{border-color:var(--ios-blue);box-shadow:0 0 0 3px rgba(10,132,255,0.18)}
+
+.ios-btn{padding:8px 18px;border-radius:10px;border:none;cursor:pointer;font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:13px;transition:var(--transition);white-space:nowrap}
+.ios-btn-primary{background:var(--ios-blue);color:#fff}
+.ios-btn-primary:hover{filter:brightness(1.12);transform:translateY(-1px);box-shadow:0 4px 14px rgba(10,132,255,0.4)}
+.ios-btn-ghost{background:var(--bg-tertiary);color:var(--label-sec);border:1px solid var(--sep)}
+.ios-btn-ghost:hover{background:var(--bg-grouped);color:var(--label-pri)}
+.ios-btn-danger{background:rgba(255,69,58,0.15);color:var(--ios-red);border:1px solid rgba(255,69,58,0.25)}
+.ios-btn-danger:hover{background:rgba(255,69,58,0.25)}
+
+.status-pill{display:flex;align-items:center;gap:7px;background:var(--bg-tertiary);border:1px solid var(--sep);border-radius:30px;padding:6px 14px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--label-sec)}
+.status-dot{width:7px;height:7px;border-radius:50%;background:var(--label-ter);transition:all 0.3s}
+.status-dot.online{background:var(--ios-green);box-shadow:0 0 0 3px rgba(48,209,88,0.22);animation:pulse 2s infinite}
+.status-dot.error{background:var(--ios-red)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+
+/* ── ALERTS ── */
+.alerts{margin-bottom:18px}
+.alert-item{display:flex;align-items:center;gap:12px;background:rgba(255,69,58,0.10);border:1px solid rgba(255,69,58,0.22);border-left:3px solid var(--ios-red);border-radius:var(--radius-md);padding:12px 16px;margin-bottom:8px;animation:slideInLeft 0.3s ease;font-size:13px}
+.alert-item.warning{background:rgba(255,159,10,0.10);border-color:rgba(255,159,10,0.22);border-left-color:var(--ios-orange)}
+@keyframes slideInLeft{from{opacity:0;transform:translateX(-12px)}to{opacity:1;transform:translateX(0)}}
+
+/* ── DEVICE STRIP ── */
+.device-strip{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:22px}
+.dv-card{padding:16px 18px;display:flex;align-items:center;gap:12px;animation:fadeUp 0.5s ease both;box-shadow:var(--shadow-card)}
+.dv-card:nth-child(1){animation-delay:0.05s}
+.dv-card:nth-child(2){animation-delay:0.10s}
+.dv-card:nth-child(3){animation-delay:0.15s}
+.dv-card:nth-child(4){animation-delay:0.20s}
+.dv-card:nth-child(5){animation-delay:0.25s}
+.dv-icon{font-size:22px;width:44px;height:44px;background:var(--bg-tertiary);border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.dv-lbl{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--label-ter);font-family:'JetBrains Mono',monospace;margin-bottom:3px}
+.dv-val{font-size:15px;font-weight:600;color:var(--label-pri);font-family:'JetBrains Mono',monospace}
+.dv-sub{font-size:11px;color:var(--label-sec);margin-top:1px}
+
+/* ── SECTION TITLE ── */
+.section-title{font-size:20px;font-weight:700;color:var(--label-pri);margin-bottom:14px;display:flex;align-items:center;gap:10px;letter-spacing:-0.2px}
+.section-title::after{content:'';flex:1;height:1px;background:var(--sep)}
+
+/* ── SENSOR GRID ── */
+.sensor-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px}
+
+.sc{padding:20px 22px;position:relative;overflow:hidden;box-shadow:var(--shadow-card);animation:fadeUp 0.5s ease both}
+.sc::after{content:'';position:absolute;top:0;left:0;width:3px;height:100%;border-radius:20px 0 0 20px;opacity:0.8}
+.sc-co2::after   {background:var(--ios-orange)}
+.sc-lux::after   {background:var(--ios-yellow)}
+.sc-temp::after  {background:var(--ios-teal)}
+.sc-hum::after   {background:var(--ios-blue)}
+.sc-soil::after  {background:var(--ios-green)}
+.sc-moist::after {background:var(--ios-purple)}
+.sc-pt100::after {background:var(--ios-red)}
+.sc-ssid::after  {background:var(--ios-indigo)}
+
+.sc-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px}
+.sc-lbl{font-size:11px;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:1.8px;color:var(--label-ter);margin-bottom:3px}
+.sc-name{font-size:13px;font-weight:500;color:var(--label-sec)}
+
+.badge{padding:3px 9px;border-radius:20px;font-size:10px;font-family:'JetBrains Mono',monospace;font-weight:500;letter-spacing:1px;white-space:nowrap;flex-shrink:0}
+.badge-wait{background:var(--bg-grouped);color:var(--label-ter)}
+.badge-live{background:rgba(48,209,88,0.18);color:var(--ios-green);border:1px solid rgba(48,209,88,0.3)}
+.badge-alert{background:rgba(255,69,58,0.18);color:var(--ios-red);border:1px solid rgba(255,69,58,0.3)}
+.badge-off{background:rgba(255,159,10,0.15);color:var(--ios-orange);border:1px solid rgba(255,159,10,0.3)}
+
+.bignum{font-size:38px;font-weight:700;letter-spacing:-1px;line-height:1;margin-bottom:6px;color:var(--label-pri);font-family:'JetBrains Mono',monospace}
+.bignum .unit{font-size:18px;font-weight:400;color:var(--label-sec);margin-left:3px}
+.ts{font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--label-ter);margin-bottom:12px}
+
+.gauge-wrap{margin-bottom:10px}
+.gauge-meta{display:flex;justify-content:space-between;font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--label-ter);margin-bottom:5px}
+.gauge-track{height:4px;background:var(--bg-grouped);border-radius:4px;overflow:hidden}
+.gauge-bar{height:100%;border-radius:4px;transition:width 0.5s cubic-bezier(0.4,0,0.2,1);width:0%}
+.gauge-bar-co2   {background:linear-gradient(90deg,var(--ios-green),var(--ios-yellow),var(--ios-orange),var(--ios-red))}
+.gauge-bar-lux   {background:linear-gradient(90deg,var(--ios-indigo),var(--ios-teal),var(--ios-yellow))}
+.gauge-bar-temp  {background:linear-gradient(90deg,var(--ios-teal),var(--ios-green),var(--ios-yellow),var(--ios-red))}
+.gauge-bar-hum   {background:linear-gradient(90deg,var(--ios-blue),var(--ios-teal))}
+.gauge-bar-soil  {background:linear-gradient(90deg,var(--ios-green),var(--ios-teal))}
+.gauge-bar-moist {background:linear-gradient(90deg,var(--ios-red),var(--ios-orange),var(--ios-blue))}
+.gauge-bar-pt100 {background:linear-gradient(90deg,var(--ios-teal),var(--ios-red))}
+
+.sparkbox{height:46px}
+
+@keyframes flashCard{0%,100%{opacity:1}50%{opacity:.75}}
+.flash{animation:flashCard 0.3s ease}
+
+/* ── RELAY STATUS CARDS ── */
+.relay-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:22px}
+.relay-card{padding:20px 22px;display:flex;align-items:center;justify-content:space-between;box-shadow:var(--shadow-card)}
+.relay-info .relay-name{font-size:15px;font-weight:600;margin-bottom:3px}
+.relay-info .relay-sub{font-size:12px;color:var(--label-ter);font-family:'JetBrains Mono',monospace}
+.relay-indicator{
+  width:56px;height:28px;border-radius:30px;
+  display:flex;align-items:center;
+  padding:3px;
+  transition:background 0.3s;
+  background:var(--bg-grouped);
+}
+.relay-indicator.on{background:var(--ios-green)}
+.relay-knob{
+  width:22px;height:22px;border-radius:50%;background:#fff;
+  box-shadow:0 2px 6px rgba(0,0,0,0.3);
+  transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  transform:translateX(0);
+}
+.relay-indicator.on .relay-knob{transform:translateX(28px)}
+.relay-label{font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--label-sec);margin-top:6px;text-align:center}
+
+/* ── CHARTS ROW ── */
+.charts-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:22px}
+.ch-panel{padding:22px 24px}
+.ch-title{font-size:14px;font-weight:600;color:var(--label-sec);margin-bottom:16px;font-family:'JetBrains Mono',monospace;letter-spacing:0.5px}
+.ch-canvas-wrap{height:200px}
+
+/* ── CONTROLS ── */
+.controls-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:22px}
+.ctrl-panel{padding:22px 24px}
+.ctrl-title{font-size:13px;font-weight:600;color:var(--label-sec);margin-bottom:16px;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:1.5px}
+.ctrl-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--sep)}
+.ctrl-row:last-child{border-bottom:none}
+.ctrl-name{font-size:14px;font-weight:500}
+.ctrl-sub{font-size:12px;color:var(--label-ter);margin-top:2px}
+
+/* ── LOG PANEL ── */
+.log-panel{padding:18px 22px;margin-bottom:22px}
+.log-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.log-hdr h3{font-size:13px;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:2px;color:var(--label-sec)}
+.log-clear{font-size:11px;color:var(--ios-blue);cursor:pointer;font-family:'JetBrains Mono',monospace;transition:opacity 0.2s}
+.log-clear:hover{opacity:0.7}
+.log-body{max-height:220px;overflow-y:auto}
+.log-body::-webkit-scrollbar{width:4px}
+.log-body::-webkit-scrollbar-track{background:transparent}
+.log-body::-webkit-scrollbar-thumb{background:var(--sep-strong);border-radius:4px}
+.lr{padding:6px 0;border-bottom:1px solid var(--sep);font-family:'JetBrains Mono',monospace;font-size:11.5px;line-height:1.5}
+.lr:last-child{border-bottom:none}
+.lt{color:var(--label-ter)}
+.lk{color:var(--ios-blue)}
+.lv{color:var(--label-sec)}
+
+/* ── AI INSIGHTS ── */
+.ai-panel{padding:22px 24px;margin-bottom:22px}
+.ai-header{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.ai-badge{padding:4px 10px;background:rgba(94,92,230,0.15);border:1px solid rgba(94,92,230,0.3);border-radius:20px;font-size:11px;color:var(--ios-indigo);font-family:'JetBrains Mono',monospace;letter-spacing:1px}
+.ai-content{font-size:14px;color:var(--label-sec);line-height:1.7;padding:14px 18px;background:rgba(94,92,230,0.06);border-radius:var(--radius-md);border:1px solid rgba(94,92,230,0.12);min-height:60px}
+.ai-ask-row{display:flex;gap:10px;margin-top:14px}
+.ai-ask-row input{flex:1;background:var(--bg-tertiary);border:1px solid var(--sep);color:var(--label-pri);border-radius:var(--radius-sm);padding:9px 14px;font-family:'Space Grotesk',sans-serif;font-size:13px;outline:none;transition:var(--transition)}
+.ai-ask-row input:focus{border-color:var(--ios-indigo);box-shadow:0 0 0 3px rgba(94,92,230,0.15)}
+.ai-spinner{display:none;align-items:center;justify-content:center}
+.ai-spinner.on{display:flex}
+.spinner-dot{width:8px;height:8px;border-radius:50%;background:var(--ios-indigo);animation:spin-bounce 1.2s infinite;margin:0 3px}
+.spinner-dot:nth-child(2){animation-delay:0.2s}
+.spinner-dot:nth-child(3){animation-delay:0.4s}
+@keyframes spin-bounce{0%,80%,100%{transform:scale(0);opacity:0.3}40%{transform:scale(1);opacity:1}}
+
+/* ── RAW PAYLOAD ── */
+.raw-panel{padding:18px 22px;margin-bottom:22px}
+.raw-pre{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ios-green);background:rgba(48,209,88,0.05);border:1px solid rgba(48,209,88,0.12);border-radius:var(--radius-md);padding:14px 16px;white-space:pre-wrap;word-break:break-all;max-height:120px;overflow-y:auto;line-height:1.7}
+
+footer{text-align:center;padding:30px 0 10px;font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--label-ter);letter-spacing:1px}
+
+@keyframes fadeSlideDown{from{opacity:0;transform:translateY(-14px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--sep-strong);border-radius:6px}
+
+@media(max-width:1100px){
+  .sensor-grid{grid-template-columns:repeat(2,1fr)}
+  .charts-row{grid-template-columns:1fr}
+  .device-strip{grid-template-columns:repeat(3,1fr)}
+  .controls-row{grid-template-columns:1fr}
+}
+@media(max-width:680px){
+  .sensor-grid{grid-template-columns:1fr}
+  .device-strip{grid-template-columns:repeat(2,1fr)}
+  .relay-grid{grid-template-columns:1fr}
+  header{flex-direction:column;align-items:flex-start}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- HEADER -->
+<header>
+  <div class="brand">
+    <div class="brand-mark">&#x1F33F;</div>
+    <div>
+      <div class="brand-name">PlantOS</div>
+      <div class="brand-sub">RDH001 · HiveMQ · Claude AI</div>
+    </div>
+  </div>
+  <div class="hdr-right">
+    <div class="seg-ctrl">
+      <button class="seg-btn" onclick="setTheme('light')">Light</button>
+      <button class="seg-btn active" onclick="setTheme('dark')">Dark</button>
+    </div>
+    <div class="broker-row">
+      <input id="brokerUrl" value="wss://f388acb36bf542b69c0c3cb96cb2cb16.s1.eu.hivemq.cloud:8884/mqtt" placeholder="wss://broker:port/mqtt"/>
+      <input id="brokerUser" value="plantos" placeholder="username" style="width:90px"/>
+      <input id="brokerPass" type="password" value="Plantos1" placeholder="password" style="width:90px"/>
+      <button class="ios-btn ios-btn-primary" onclick="connectMqtt()">Connect</button>
+      <button class="ios-btn ios-btn-danger" onclick="disconnectMqtt()">Disconnect</button>
+    </div>
+    <div class="status-pill"><div class="status-dot" id="mqttDot"></div><span id="mqttLbl">MQTT OFFLINE</span></div>
+  </div>
+</header>
+
+<!-- ALERTS -->
+<div id="alerts" class="alerts"></div>
+
+<!-- DEVICE STRIP -->
+<div class="device-strip">
+  <div class="glass dv-card"><div class="dv-icon">&#x1F4E1;</div><div><div class="dv-lbl">Device</div><div class="dv-val">RDH001</div><div class="dv-sub" id="dv-ssid">SSID: —</div></div></div>
+  <div class="glass dv-card"><div class="dv-icon">&#x1F321;</div><div><div class="dv-lbl">Air Temp</div><div class="dv-val" id="dv-temp">—</div><div class="dv-sub">DHT22</div></div></div>
+  <div class="glass dv-card"><div class="dv-icon">&#x1F4A7;</div><div><div class="dv-lbl">Humidity</div><div class="dv-val" id="dv-hum">—</div><div class="dv-sub">DHT22</div></div></div>
+  <div class="glass dv-card"><div class="dv-icon">&#x1F4AC;</div><div><div class="dv-lbl">Messages</div><div class="dv-val" id="dv-msgs">0</div><div class="dv-sub" id="dv-last">Last: —</div></div></div>
+  <div class="glass dv-card"><div class="dv-icon">&#x26A1;</div><div><div class="dv-lbl">Relays</div><div class="dv-val" id="dv-relays">— / —</div><div class="dv-sub">Pump / Light</div></div></div>
+</div>
+
+<!-- SENSORS -->
+<div class="section-title">Live Sensor Readings</div>
+<div class="sensor-grid">
+
+  <!-- Air Temp DHT22 -->
+  <div class="glass sc sc-temp" id="sc-temp" style="animation-delay:0.05s">
+    <div class="sc-header">
+      <div><div class="sc-lbl">Air Temperature</div><div class="sc-name">DHT22</div></div>
+      <span class="badge badge-wait" id="b-temp">WAIT</span>
+    </div>
+    <div class="bignum" id="v-temp">—<span class="unit"> °C</span></div>
+    <div class="ts" id="t-temp">—</div>
+    <div class="gauge-wrap">
+      <div class="gauge-meta"><span>0</span><span id="gv-temp">—</span><span>60</span></div>
+      <div class="gauge-track"><div class="gauge-bar gauge-bar-temp" id="gf-temp"></div></div>
+    </div>
+    <div class="sparkbox"><canvas id="sp-temp"></canvas></div>
+  </div>
+
+  <!-- Humidity DHT22 -->
+  <div class="glass sc sc-hum" id="sc-hum" style="animation-delay:0.10s">
+    <div class="sc-header">
+      <div><div class="sc-lbl">Air Humidity</div><div class="sc-name">DHT22</div></div>
+      <span class="badge badge-wait" id="b-hum">WAIT</span>
+    </div>
+    <div class="bignum" id="v-hum">—<span class="unit"> %</span></div>
+    <div class="ts" id="t-hum">—</div>
+    <div class="gauge-wrap">
+      <div class="gauge-meta"><span>0%</span><span id="gv-hum">—</span><span>100%</span></div>
+      <div class="gauge-track"><div class="gauge-bar gauge-bar-hum" id="gf-hum"></div></div>
+    </div>
+    <div class="sparkbox"><canvas id="sp-hum"></canvas></div>
+  </div>
+
+  <!-- Soil Moisture -->
+  <div class="glass sc sc-moist" id="sc-moist" style="animation-delay:0.15s">
+    <div class="sc-header">
+      <div><div class="sc-lbl">Soil Moisture</div><div class="sc-name">Capacitive</div></div>
+      <span class="badge badge-wait" id="b-moist">WAIT</span>
+    </div>
+    <div class="bignum" id="v-moist">—<span class="unit"> %</span></div>
+    <div class="ts" id="t-moist">—</div>
+    <div class="gauge-wrap">
+      <div class="gauge-meta"><span>0%</span><span id="gv-moist">—</span><span>100%</span></div>
+      <div class="gauge-track"><div class="gauge-bar gauge-bar-moist" id="gf-moist"></div></div>
+    </div>
+    <div class="sparkbox"><canvas id="sp-moist"></canvas></div>
+  </div>
+
+  <!-- Light BH1750 -->
+  <div class="glass sc sc-lux" id="sc-lux" style="animation-delay:0.20s">
+    <div class="sc-header">
+      <div><div class="sc-lbl">Light Intensity</div><div class="sc-name">BH1750</div></div>
+      <span class="badge badge-wait" id="b-lux">WAIT</span>
+    </div>
+    <div class="bignum" id="v-lux">—<span class="unit"> lux</span></div>
+    <div class="ts" id="t-lux">—</div>
+    <div class="gauge-wrap">
+      <div class="gauge-meta"><span>0</span><span id="gv-lux">—</span><span>65535</span></div>
+      <div class="gauge-track"><div class="gauge-bar gauge-bar-lux" id="gf-lux"></div></div>
+    </div>
+    <div class="sparkbox"><canvas id="sp-lux"></canvas></div>
+  </div>
+
+  <!-- MQ135 -->
+  <div class="glass sc sc-co2" id="sc-co2" style="animation-delay:0.25s">
+    <div class="sc-header">
+      <div><div class="sc-lbl">Air Quality</div><div class="sc-name">MQ135 (ADC raw)</div></div>
+      <span class="badge badge-wait" id="b-co2">WAIT</span>
+    </div>
+    <div class="bignum" id="v-co2">—<span class="unit"> raw</span></div>
+    <div class="ts" id="t-co2">—</div>
+    <div class="gauge-wrap">
+      <div class="gauge-meta"><span>0</span><span id="gv-co2">—</span><span>4095</span></div>
+      <div class="gauge-track"><div class="gauge-bar gauge-bar-co2" id="gf-co2"></div></div>
+    </div>
+    <div class="sparkbox"><canvas id="sp-co2"></canvas></div>
+  </div>
+
+  <!-- DS18B20 Soil Temp -->
+  <div class="glass sc sc-soil" id="sc-soil" style="animation-delay:0.30s">
+    <div class="sc-header">
+      <div><div class="sc-lbl">Soil Temperature</div><div class="sc-name">DS18B20</div></div>
+      <span class="badge badge-wait" id="b-soil">WAIT</span>
+    </div>
+    <div class="bignum" id="v-soil">—<span class="unit"> °C</span></div>
+    <div class="ts" id="t-soil">—</div>
+    <div class="gauge-wrap">
+      <div class="gauge-meta"><span>-55</span><span id="gv-soil">—</span><span>125</span></div>
+      <div class="gauge-track"><div class="gauge-bar gauge-bar-soil" id="gf-soil"></div></div>
+    </div>
+    <div class="sparkbox"><canvas id="sp-soil"></canvas></div>
+  </div>
+
+  <!-- PT100 -->
+  <div class="glass sc sc-pt100" id="sc-pt100" style="animation-delay:0.35s">
+    <div class="sc-header">
+      <div><div class="sc-lbl">Solution Temp</div><div class="sc-name">PT100 RTD</div></div>
+      <span class="badge badge-wait" id="b-pt100">WAIT</span>
+    </div>
+    <div class="bignum" id="v-pt100">—<span class="unit"> °C</span></div>
+    <div class="ts" id="t-pt100">—</div>
+    <div class="gauge-wrap">
+      <div class="gauge-meta"><span>0</span><span id="gv-pt100">—</span><span>100</span></div>
+      <div class="gauge-track"><div class="gauge-bar gauge-bar-pt100" id="gf-pt100"></div></div>
+    </div>
+    <div class="sparkbox"><canvas id="sp-pt100"></canvas></div>
+  </div>
+
+  <!-- SSID / Connection info -->
+  <div class="glass sc sc-ssid" id="sc-ssid" style="animation-delay:0.40s">
+    <div class="sc-header">
+      <div><div class="sc-lbl">WiFi Network</div><div class="sc-name">Connected SSID</div></div>
+      <span class="badge badge-wait" id="b-ssid">WAIT</span>
+    </div>
+    <div style="font-size:20px;font-weight:700;font-family:'JetBrains Mono',monospace;line-height:1.3;margin-bottom:6px;word-break:break-all" id="v-ssid">—</div>
+    <div class="ts" id="t-ssid">—</div>
+    <div style="margin-top:12px;font-size:12px;color:var(--label-ter);font-family:'JetBrains Mono',monospace">Topic: device/RDH001/data</div>
+    <div style="margin-top:6px;font-size:12px;color:var(--label-ter);font-family:'JetBrains Mono',monospace">Interval: 5 s</div>
+  </div>
+
+</div>
+
+<!-- RELAY STATUS -->
+<div class="section-title">Relay Automation Status</div>
+<div class="relay-grid">
+  <div class="glass relay-card">
+    <div class="relay-info">
+      <div class="relay-name">Irrigation Pump</div>
+      <div class="relay-sub">Relay 1 · GPIO21 · Auto: soil &lt;25%</div>
+    </div>
+    <div>
+      <div class="relay-indicator" id="relay1-ind"><div class="relay-knob"></div></div>
+      <div class="relay-label" id="relay1-lbl">OFF</div>
+    </div>
+  </div>
+  <div class="glass relay-card">
+    <div class="relay-info">
+      <div class="relay-name">Grow Light</div>
+      <div class="relay-sub">Relay 2 · GPIO19 · Auto: lux &lt;200</div>
+    </div>
+    <div>
+      <div class="relay-indicator" id="relay2-ind"><div class="relay-knob"></div></div>
+      <div class="relay-label" id="relay2-lbl">OFF</div>
+    </div>
+  </div>
+</div>
+
+<!-- CHARTS -->
+<div class="section-title">Trend Analysis</div>
+<div class="charts-row">
+  <div class="glass ch-panel"><div class="ch-title">TEMPERATURE TIMELINE (°C)</div><div class="ch-canvas-wrap"><canvas id="ch-temp"></canvas></div></div>
+  <div class="glass ch-panel"><div class="ch-title">SOIL MOISTURE & HUMIDITY (%)</div><div class="ch-canvas-wrap"><canvas id="ch-moist"></canvas></div></div>
+</div>
+
+<!-- ALERT THRESHOLDS -->
+<div class="section-title">Alert Thresholds</div>
+<div class="controls-row">
+  <div class="glass ctrl-panel">
+    <div class="ctrl-title">Sensor Alerts</div>
+    <div class="ctrl-row"><div><div class="ctrl-name">Temp Warning</div><div class="ctrl-sub" id="th-temp-lbl">35 °C</div></div><input type="range" min="20" max="60" value="35" oninput="updateThreshold('temp',this.value,'°C')" style="width:110px;accent-color:var(--ios-red)"></div>
+    <div class="ctrl-row"><div><div class="ctrl-name">Humidity Warning</div><div class="ctrl-sub" id="th-hum-lbl">85 %</div></div><input type="range" min="30" max="100" value="85" oninput="updateThreshold('hum',this.value,'%')" style="width:110px;accent-color:var(--ios-blue)"></div>
+    <div class="ctrl-row"><div><div class="ctrl-name">Moisture Dry Alert</div><div class="ctrl-sub" id="th-moist-lbl">25 %</div></div><input type="range" min="5" max="60" value="25" oninput="updateThreshold('moist',this.value,'%')" style="width:110px;accent-color:var(--ios-purple)"></div>
+    <div class="ctrl-row"><div><div class="ctrl-name">PT100 Warning</div><div class="ctrl-sub" id="th-pt100-lbl">50 °C</div></div><input type="range" min="10" max="100" value="50" oninput="updateThreshold('pt100',this.value,'°C')" style="width:110px;accent-color:var(--ios-red)"></div>
+  </div>
+  <div class="glass ctrl-panel">
+    <div class="ctrl-title">Connection Info</div>
+    <div class="ctrl-row"><div><div class="ctrl-name">Broker</div><div class="ctrl-sub">HiveMQ Cloud · TLS 8884</div></div></div>
+    <div class="ctrl-row"><div><div class="ctrl-name">Topic</div><div class="ctrl-sub">device/RDH001/data</div></div></div>
+    <div class="ctrl-row"><div><div class="ctrl-name">Publish Rate</div><div class="ctrl-sub">Every 5 seconds</div></div></div>
+    <div class="ctrl-row"><div><div class="ctrl-name">Protocol</div><div class="ctrl-sub">MQTT over WSS</div></div></div>
+  </div>
+</div>
+
+<!-- AI ADVISOR -->
+<div class="section-title">AI Growth Advisor</div>
+<div class="glass ai-panel">
+  <div class="ai-header">
+    <span class="section-title" style="font-size:16px;margin:0">Advisor</span>
+    <span class="ai-badge">CLAUDE AI</span>
+    <div class="ai-spinner" id="aiSpinner"><div class="spinner-dot"></div><div class="spinner-dot"></div><div class="spinner-dot"></div></div>
+  </div>
+  <div class="ai-content" id="aiContent">Connect to MQTT and ask a question about your plant's health…</div>
+  <div class="ai-ask-row">
+    <input id="aiInput" placeholder="e.g. Is my plant healthy? Should I water it now?" onkeydown="if(event.key==='Enter')askAI()"/>
+    <button class="ios-btn ios-btn-primary" onclick="askAI()">Ask AI</button>
+  </div>
+</div>
+
+<!-- RAW PAYLOAD -->
+<div class="section-title">Last Raw Payload</div>
+<div class="glass raw-panel">
+  <pre class="raw-pre" id="rawPayload">Waiting for data on device/RDH001/data …</pre>
+</div>
+
+<!-- LOG -->
+<div class="section-title">MQTT Message Log</div>
+<div class="glass log-panel">
+  <div class="log-hdr">
+    <h3>Live Feed</h3>
+    <span class="log-clear" onclick="clearLog()">[ clear ]</span>
+  </div>
+  <div class="log-body" id="logBody"></div>
+</div>
+
+<footer>PlantOS · RDH001 · HiveMQ Cloud · Claude AI · device/RDH001/data</footer>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+//  CHART SETUP
+// ══════════════════════════════════════════════════════════════
+const MAX = 40;
+const sparks = {};
+let chTemp, chMoist;
+
+function tcol() { return document.documentElement.dataset.theme === 'dark' ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.22)'; }
+function gcol() { return document.documentElement.dataset.theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'; }
+
+function mkSpark(id, color) {
+  const ctx = document.getElementById(id)?.getContext('2d');
+  if (!ctx) return null;
+  return new Chart(ctx, {
+    type: 'line',
+    data: { labels: [], datasets: [{ data: [], borderColor: color, borderWidth: 1.5, fill: true, backgroundColor: color + '20', tension: 0.5, pointRadius: 0 }] },
+    options: { animation: false, plugins: { legend: { display: false }, tooltip: { enabled: false } }, scales: { x: { display: false }, y: { display: false } }, responsive: true, maintainAspectRatio: false }
+  });
+}
+
+function mkBig(id, labels, colors) {
+  const ctx = document.getElementById(id)?.getContext('2d');
+  if (!ctx) return null;
+  return new Chart(ctx, {
+    type: 'line',
+    data: { labels: [], datasets: labels.map((l, i) => ({ label: l, data: [], borderColor: colors[i], borderWidth: 2, fill: false, tension: 0.4, pointRadius: 2.5, pointBackgroundColor: colors[i] })) },
+    options: {
+      animation: false,
+      plugins: { legend: { labels: { color: tcol(), font: { size: 11, family: "'JetBrains Mono', monospace" }, boxWidth: 14 } } },
+      scales: {
+        x: { ticks: { color: tcol(), font: { size: 10 }, maxTicksLimit: 8 }, grid: { color: gcol() } },
+        y: { ticks: { color: tcol(), font: { size: 10 } }, grid: { color: gcol() } }
+      },
+      responsive: true, maintainAspectRatio: false
+    }
+  });
+}
+
+function updateChartColors() {
+  [chTemp, chMoist].forEach(c => {
+    if (!c) return;
+    const t = tcol(), g = gcol();
+    c.options.plugins.legend.labels.color = t;
+    c.options.scales.x.ticks.color = t; c.options.scales.y.ticks.color = t;
+    c.options.scales.x.grid.color = g;  c.options.scales.y.grid.color = g;
+    c.update('none');
+  });
+}
+
+function pushSpark(k, v) {
+  const c = sparks[k]; if (!c) return;
+  const t = tsFmt();
+  if (c.data.labels.length >= MAX) { c.data.labels.shift(); c.data.datasets[0].data.shift(); }
+  c.data.labels.push(t); c.data.datasets[0].data.push(v);
+  c.update('none');
+}
+
+function pushBig(ch, idx, v) {
+  if (!ch) return;
+  const t = tsFmt();
+  if (idx === 0 && ch.data.labels.length >= MAX) ch.data.labels.shift();
+  if (ch.data.datasets[idx].data.length >= MAX) ch.data.datasets[idx].data.shift();
+  if (idx === 0) ch.data.labels.push(t);
+  ch.data.datasets[idx].data.push(v);
+  ch.update('none');
+}
+
+function initCharts() {
+  // sparklines for each sensor
+  sparks['temp']  = mkSpark('sp-temp',  '#5AC8FA');
+  sparks['hum']   = mkSpark('sp-hum',   '#0A84FF');
+  sparks['moist'] = mkSpark('sp-moist', '#BF5AF2');
+  sparks['lux']   = mkSpark('sp-lux',   '#FFD60A');
+  sparks['co2']   = mkSpark('sp-co2',   '#FF9F0A');
+  sparks['soil']  = mkSpark('sp-soil',  '#30D158');
+  sparks['pt100'] = mkSpark('sp-pt100', '#FF453A');
+  chTemp  = mkBig('ch-temp',  ['Air Temp (°C)', 'PT100 (°C)', 'DS18B20 (°C)'], ['#5AC8FA', '#FF453A', '#30D158']);
+  chMoist = mkBig('ch-moist', ['Moisture (%)', 'Humidity (%)'],                ['#BF5AF2', '#0A84FF']);
+}
+
+// ══════════════════════════════════════════════════════════════
+//  HELPERS
+// ══════════════════════════════════════════════════════════════
+let msgCount = 0;
+function tsFmt(ms) { return new Date(ms || Date.now()).toLocaleTimeString('en', { hour12: false }); }
+
+function gauge(id, v, mn, mx) {
+  const p = Math.min(100, Math.max(0, (v - mn) / (mx - mn) * 100));
+  const el = document.getElementById('gf-' + id); if (el) el.style.width = p.toFixed(1) + '%';
+  const gv = document.getElementById('gv-' + id); if (gv) gv.textContent = v;
+}
+
+function setLive(id, alertOn) {
+  const b = document.getElementById('b-' + id); if (!b) return;
+  if (alertOn) { b.textContent = 'ALERT'; b.className = 'badge badge-alert'; }
+  else { b.textContent = 'LIVE'; b.className = 'badge badge-live'; }
+}
+
+function setOff(id) {
+  const b = document.getElementById('b-' + id); if (!b) return;
+  b.textContent = 'N/A'; b.className = 'badge badge-off';
+}
+
+function flash(id) {
+  const e = document.getElementById('sc-' + id); if (!e) return;
+  e.classList.remove('flash'); void e.offsetWidth; e.classList.add('flash');
+}
+
+function logMsg(topic, summary) {
+  msgCount++;
+  const el = document.getElementById('dv-msgs'); if (el) el.textContent = msgCount;
+  const la = document.getElementById('dv-last'); if (la) la.textContent = 'Last: ' + tsFmt();
+  const lb = document.getElementById('logBody'); if (!lb) return;
+  const d = document.createElement('div');
+  d.className = 'lr';
+  d.innerHTML = `<span class="lt">[${tsFmt()}]</span> <span class="lk">${topic}</span> &rarr; <span class="lv">${summary}</span>`;
+  lb.prepend(d);
+  if (lb.children.length > 200) lb.lastChild.remove();
+}
+function clearLog() { const lb = document.getElementById('logBody'); if (lb) lb.innerHTML = ''; }
+
+// ══════════════════════════════════════════════════════════════
+//  RELAY DISPLAY
+// ══════════════════════════════════════════════════════════════
+function setRelayDisplay(n, on) {
+  const ind = document.getElementById('relay' + n + '-ind');
+  const lbl = document.getElementById('relay' + n + '-lbl');
+  if (ind) { ind.classList.toggle('on', on); }
+  if (lbl) { lbl.textContent = on ? 'ON' : 'OFF'; lbl.style.color = on ? 'var(--ios-green)' : 'var(--label-ter)'; }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  ALERTS
+// ══════════════════════════════════════════════════════════════
+const alertState = {};
+const thresholds = { temp: 35, hum: 85, moist: 25, pt100: 50 };
+
+function updateThreshold(k, v, unit) {
+  thresholds[k] = +v;
+  const el = document.getElementById('th-' + k + '-lbl');
+  if (el) el.textContent = v + ' ' + unit;
+}
+
+function checkAlert(k, v) {
+  const warn = thresholds[k];
+  const labels = { temp: 'Air Temp', hum: 'Humidity', moist: 'Soil Moisture', pt100: 'PT100 Temp' };
+  const units  = { temp: '°C', hum: '%', moist: '%', pt100: '°C' };
+  if (!warn) return false;
+  const isAlert = (k === 'moist') ? v < warn : v >= warn;
+  if (isAlert && alertState[k] !== true) {
+    alertState[k] = true;
+    let el = document.getElementById('al-' + k);
+    if (!el) { el = document.createElement('div'); el.id = 'al-' + k; el.className = 'alert-item'; document.getElementById('alerts').appendChild(el); }
+    const icon = k === 'moist' ? '&#x1F4A7;' : (v >= warn * 1.2 ? '&#x1F534;' : '&#x1F7E0;');
+    el.className = 'alert-item' + (v >= warn * 1.2 ? '' : ' warning');
+    el.innerHTML = `${icon} <strong style="color:inherit">${k === 'moist' ? 'LOW MOISTURE' : 'THRESHOLD EXCEEDED'}:</strong> ${labels[k]} = ${v} ${units[k]}`;
+  } else if (!isAlert && alertState[k]) {
+    alertState[k] = false;
+    document.getElementById('al-' + k)?.remove();
+  }
+  return isAlert;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  MQTT — FLAT JSON HANDLER  (device/RDH001/data)
+//
+//  Firmware publishes one flat JSON object every 5 s:
+//  {
+//    "ssid":     "...",
+//    "dht_temp": 33.30,
+//    "dht_hum":  60.90,
+//    "soil_pct": 0.0,
+//    "lux":      null | float,
+//    "mq135":    0,
+//    "ds18b20":  null | float,
+//    "pt100":    1.88,
+//    "relay1":   true|false,
+//    "relay2":   true|false
+//  }
+// ══════════════════════════════════════════════════════════════
+let mqttClient = null;
+const sensorState = {};
+
+function setMqttStatus(s) {
+  const dot = document.getElementById('mqttDot');
+  const lbl = document.getElementById('mqttLbl');
+  if (!dot || !lbl) return;
+  dot.className = 'status-dot' + (s === 'online' ? ' online' : s === 'error' ? ' error' : '');
+  lbl.textContent = { online: 'MQTT ONLINE', error: 'MQTT ERROR', connecting: 'CONNECTING…', offline: 'MQTT OFFLINE' }[s] || s.toUpperCase();
+}
+
+function connectMqtt() {
+  if (mqttClient) { mqttClient.end(true); mqttClient = null; }
+  const url  = document.getElementById('brokerUrl').value.trim();
+  const user = document.getElementById('brokerUser').value.trim();
+  const pass = document.getElementById('brokerPass').value.trim();
+  setMqttStatus('connecting');
+  const opts = { connectTimeout: 12000, reconnectPeriod: 5000 };
+  if (user) { opts.username = user; opts.password = pass; }
+  try { mqttClient = mqtt.connect(url, opts); }
+  catch (e) { setMqttStatus('error'); logMsg('system', 'Connect error: ' + e.message); return; }
+
+  mqttClient.on('connect', () => {
+    setMqttStatus('online');
+    // Subscribe to the exact topic the firmware publishes to
+    mqttClient.subscribe('device/RDH001/data', (err) => {
+      if (err) logMsg('system', 'Subscribe error: ' + err.message);
+      else logMsg('system', 'Subscribed to device/RDH001/data');
+    });
+    logMsg('system', 'Connected to ' + url);
+  });
+  mqttClient.on('error', (e) => { setMqttStatus('error'); logMsg('system', 'Error: ' + e.message); });
+  mqttClient.on('offline', () => setMqttStatus('offline'));
+  mqttClient.on('reconnect', () => setMqttStatus('connecting'));
+  mqttClient.on('message', handleMqtt);
+}
+
+function disconnectMqtt() {
+  if (mqttClient) { mqttClient.end(); mqttClient = null; }
+  setMqttStatus('offline');
+}
+
+function handleMqtt(topic, payload) {
+  let d;
+  try { d = JSON.parse(payload.toString()); }
+  catch { logMsg(topic, '[parse error] ' + payload.toString().substring(0, 60)); return; }
+
+  // Show raw payload
+  document.getElementById('rawPayload').textContent = JSON.stringify(d, null, 2);
+
+  const now = tsFmt();
+
+  // ── dht_temp ──
+  if (d.dht_temp !== undefined && d.dht_temp !== null) {
+    const v = parseFloat(d.dht_temp.toFixed(2));
+    sensorState.airTemp = v;
+    document.getElementById('v-temp').innerHTML = v + '<span class="unit"> °C</span>';
+    document.getElementById('t-temp').textContent = now;
+    document.getElementById('dv-temp').textContent = v + ' °C';
+    gauge('temp', v, 0, 60);
+    pushSpark('temp', v);
+    pushBig(chTemp, 0, v);
+    setLive('temp', checkAlert('temp', v));
+    flash('temp');
+  }
+
+  // ── dht_hum ──
+  if (d.dht_hum !== undefined && d.dht_hum !== null) {
+    const v = parseFloat(d.dht_hum.toFixed(1));
+    sensorState.humidity = v;
+    document.getElementById('v-hum').innerHTML = v + '<span class="unit"> %</span>';
+    document.getElementById('t-hum').textContent = now;
+    document.getElementById('dv-hum').textContent = v + ' %';
+    gauge('hum', v, 0, 100);
+    pushSpark('hum', v);
+    pushBig(chMoist, 1, v);
+    setLive('hum', checkAlert('hum', v));
+    flash('hum');
+  }
+
+  // ── soil_pct ──
+  if (d.soil_pct !== undefined && d.soil_pct !== null) {
+    const v = parseFloat(d.soil_pct.toFixed(1));
+    sensorState.moisture = v;
+    document.getElementById('v-moist').innerHTML = v + '<span class="unit"> %</span>';
+    document.getElementById('t-moist').textContent = now;
+    gauge('moist', v, 0, 100);
+    pushSpark('moist', v);
+    pushBig(chMoist, 0, v);
+    setLive('moist', checkAlert('moist', v));
+    flash('moist');
+  }
+
+  // ── lux (null when BH1750 disconnected) ──
+  if (d.lux !== undefined) {
+    if (d.lux === null) {
+      document.getElementById('v-lux').innerHTML = 'N/A<span class="unit"> lux</span>';
+      document.getElementById('t-lux').textContent = now;
+      setOff('lux');
+    } else {
+      const v = parseFloat(d.lux.toFixed(1));
+      sensorState.lux = v;
+      document.getElementById('v-lux').innerHTML = v + '<span class="unit"> lux</span>';
+      document.getElementById('t-lux').textContent = now;
+      gauge('lux', v, 0, 65535);
+      pushSpark('lux', v);
+      setLive('lux', false);
+      flash('lux');
+    }
+  }
+
+  // ── mq135 ──
+  if (d.mq135 !== undefined && d.mq135 !== null) {
+    const v = Math.round(d.mq135);
+    sensorState.mq135 = v;
+    document.getElementById('v-co2').innerHTML = v + '<span class="unit"> raw</span>';
+    document.getElementById('t-co2').textContent = now;
+    gauge('co2', v, 0, 4095);
+    pushSpark('co2', v);
+    setLive('co2', false);
+    flash('co2');
+  }
+
+  // ── ds18b20 (null when disconnected) ──
+  if (d.ds18b20 !== undefined) {
+    if (d.ds18b20 === null) {
+      document.getElementById('v-soil').innerHTML = 'N/A<span class="unit"> °C</span>';
+      document.getElementById('t-soil').textContent = now;
+      setOff('soil');
+    } else {
+      const v = parseFloat(d.ds18b20.toFixed(2));
+      sensorState.soilTemp = v;
+      document.getElementById('v-soil').innerHTML = v + '<span class="unit"> °C</span>';
+      document.getElementById('t-soil').textContent = now;
+      gauge('soil', v, -55, 125);
+      pushSpark('soil', v);
+      pushBig(chTemp, 2, v);
+      setLive('soil', false);
+      flash('soil');
+    }
+  }
+
+  // ── pt100 ──
+  if (d.pt100 !== undefined && d.pt100 !== null) {
+    const v = parseFloat(d.pt100.toFixed(2));
+    sensorState.pt100 = v;
+    document.getElementById('v-pt100').innerHTML = v + '<span class="unit"> °C</span>';
+    document.getElementById('t-pt100').textContent = now;
+    gauge('pt100', v, 0, 100);
+    pushSpark('pt100', v);
+    pushBig(chTemp, 1, v);
+    setLive('pt100', checkAlert('pt100', v));
+    flash('pt100');
+  }
+
+  // ── relay1 / relay2 ──
+  if (d.relay1 !== undefined) {
+    sensorState.relay1 = d.relay1;
+    setRelayDisplay(1, d.relay1);
+  }
+  if (d.relay2 !== undefined) {
+    sensorState.relay2 = d.relay2;
+    setRelayDisplay(2, d.relay2);
+  }
+  const r1 = d.relay1 ? 'ON' : 'OFF';
+  const r2 = d.relay2 ? 'ON' : 'OFF';
+  document.getElementById('dv-relays').textContent = r1 + ' / ' + r2;
+
+  // ── ssid ──
+  if (d.ssid !== undefined) {
+    sensorState.ssid = d.ssid;
+    document.getElementById('v-ssid').textContent = d.ssid;
+    document.getElementById('dv-ssid').textContent = 'SSID: ' + d.ssid;
+    document.getElementById('t-ssid').textContent = now;
+    document.getElementById('b-ssid').textContent = 'LIVE';
+    document.getElementById('b-ssid').className = 'badge badge-live';
+    flash('ssid');
+  }
+
+  logMsg(topic, `T=${d.dht_temp}°C  H=${d.dht_hum}%  Soil=${d.soil_pct}%  Lux=${d.lux}  PT100=${d.pt100}°C  R1=${r1} R2=${r2}`);
+}
+
+// ══════════════════════════════════════════════════════════════
+//  AI ADVISOR
+// ══════════════════════════════════════════════════════════════
+async function askAI() {
+  const input   = document.getElementById('aiInput');
+  const content = document.getElementById('aiContent');
+  const spinner = document.getElementById('aiSpinner');
+  const q = input.value.trim();
+  if (!q) return;
+
+  const prompt = `You are an expert plant growth advisor for an IoT monitoring system (PlantOS on ESP32).
+
+Current sensor readings:
+- Air Temperature (DHT22): ${sensorState.airTemp ?? 'no data'} °C
+- Air Humidity (DHT22): ${sensorState.humidity ?? 'no data'} %
+- Soil Moisture: ${sensorState.moisture ?? 'no data'} %
+- Light (BH1750): ${sensorState.lux ?? 'no data / sensor not connected'} lux
+- Air Quality (MQ135 raw ADC): ${sensorState.mq135 ?? 'no data'}
+- Soil Temp (DS18B20): ${sensorState.soilTemp ?? 'no data / sensor not connected'} °C
+- Solution Temp (PT100): ${sensorState.pt100 ?? 'no data'} °C
+- Irrigation Pump: ${sensorState.relay1 ? 'ON (auto-running)' : 'OFF'}
+- Grow Light: ${sensorState.relay2 ? 'ON (auto-running)' : 'OFF'}
+- Connected SSID: ${sensorState.ssid ?? 'unknown'}
+
+Automation rules: Pump turns ON when soil moisture < 25%, OFF when > 80%. Light turns ON when lux < 200, OFF when > 10000.
+
+User question: "${q}"
+
+Give a concise, actionable plant care recommendation in 2-4 sentences based on the actual sensor values above.`;
+
+  spinner.classList.add('on');
+  content.textContent = 'Thinking…';
+  input.value = '';
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 1000, messages: [{ role: 'user', content: prompt }] })
+    });
+    const data = await res.json();
+    content.textContent = data.content?.filter(b => b.type === 'text').map(b => b.text).join('') || 'No response from AI.';
+  } catch (e) {
+    content.textContent = 'Could not reach AI. Last readings: ' + JSON.stringify(sensorState);
+  }
+  spinner.classList.remove('on');
+}
+
+// ══════════════════════════════════════════════════════════════
+//  THEME
+// ══════════════════════════════════════════════════════════════
+function setTheme(t) {
+  document.documentElement.dataset.theme = t;
+  document.querySelectorAll('.seg-btn').forEach(b => {
+    b.classList.toggle('active', b.textContent.toLowerCase() === t);
+  });
+  updateChartColors();
+}
+
+// ══════════════════════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════════════════════
+initCharts();
+window.addEventListener('load', () => setTimeout(connectMqtt, 800));
+</script>
+</body>
+</html>
