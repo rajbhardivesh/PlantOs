@@ -233,6 +233,9 @@ index.html
 
 ---
 
+## Speacial  Thanks To 
+PCB Design :  Rajbhar Divesh
+Firmware & Web Dashboard: Varikar Manan 
+ : 
 ## Author
-
-**RDH Robotics**
+** Varikar Manan **
