@@ -239,3 +239,5 @@ Firmware & Web Dashboard: Varikar Manan
  : 
 ## Author
 ** Varikar Manan **
+## back-end Author 
+** himanshu dave **
